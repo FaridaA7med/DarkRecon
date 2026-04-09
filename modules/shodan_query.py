@@ -12,7 +12,7 @@ def shodan_lookup(domain, api_key=None):
     if not api_key:
         return {
             "status": "error",
-            "message": "Shodan API key not found. Get one from https://account.shodan.io"
+            "message": "Shodan API key not found. Get one from https://account.shodan.io/register"
         }
     
     try:
@@ -23,6 +23,7 @@ def shodan_lookup(domain, api_key=None):
         api = shodan.Shodan(api_key)
         result = api.host(ip)
         
+        # تجهيز النتيجة
         return {
             "status": "success",
             "ip": ip,
@@ -30,9 +31,11 @@ def shodan_lookup(domain, api_key=None):
             "organization": result.get('org', 'Unknown'),
             "operating_system": result.get('os', 'Unknown'),
             "country": result.get('country_name', 'Unknown'),
+            "city": result.get('city', 'Unknown'),
             "open_ports": result.get('ports', []),
             "vulns": result.get('vulns', []),
-            "hostnames": result.get('hostnames', [])
+            "hostnames": result.get('hostnames', []),
+            "data": result.get('data', [])
         }
         
     except shodan.APIError as e:
@@ -50,3 +53,27 @@ def shodan_lookup(domain, api_key=None):
             "status": "error",
             "message": str(e)
         }
+
+
+def shodan_search(query, api_key=None, limit=10):
+    """
+    البحث في Shodan باستخدام كلمة بحث (ميزة إضافية)
+    """
+    if api_key is None:
+        api_key = os.environ.get('SHODAN_API_KEY')
+    
+    if not api_key:
+        return {"status": "error", "message": "Shodan API key not found"}
+    
+    try:
+        api = shodan.Shodan(api_key)
+        results = api.search(query, limit=limit)
+        
+        return {
+            "status": "success",
+            "query": query,
+            "total": results.get('total', 0),
+            "results": results.get('matches', [])
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}

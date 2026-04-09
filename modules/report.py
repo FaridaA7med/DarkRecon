@@ -14,54 +14,25 @@ def save_report(domain, data):
         json.dump(data, f, indent=2, default=str)
     print(f"[+] JSON report saved: {json_file}")
     
-    # حفظ Markdown
+    # حفظ Markdown عادي
     md_file = f"reports/DarkRecon_{domain}_{timestamp}.md"
     with open(md_file, "w", encoding="utf-8") as f:
         f.write(f"# DarkRecon Report - {domain}\n\n")
         f.write(f"**Scan Time:** {data['timestamp']}\n")
         f.write(f"**Mode:** {data['mode']}\n\n")
         f.write("---\n\n")
-        
-        if "passive" in data:
-            f.write("## 🔍 Passive Reconnaissance Results\n\n")
-            
-            # WHOIS
-            if "whois" in data["passive"]:
-                f.write("### WHOIS Information\n")
-                f.write("```json\n")
-                f.write(json.dumps(data["passive"]["whois"], indent=2, default=str))
-                f.write("\n```\n\n")
-            
-            # DNS
-            if "dns_records" in data["passive"]:
-                f.write("### DNS Records\n")
-                f.write("```json\n")
-                f.write(json.dumps(data["passive"]["dns_records"], indent=2, default=str))
-                f.write("\n```\n\n")
-            
-            # SSL
-            if "ssl_info" in data["passive"]:
-                f.write("### SSL Certificate Information\n")
-                f.write("```json\n")
-                f.write(json.dumps(data["passive"]["ssl_info"], indent=2, default=str))
-                f.write("\n```\n\n")
-        
-        if "active" in data:
-            f.write("## 🎯 Active Reconnaissance Results\n\n")
-            f.write("```json\n")
-            f.write(json.dumps(data["active"], indent=2, default=str))
-            f.write("\n```\n\n")
+        f.write("```json\n")
+        f.write(json.dumps(data, indent=2, default=str))
+        f.write("\n```\n")
     
-    print(f"[+] Markdown report saved: {md_file}")
-    # Professional report
+    # حفظ التقرير الاحترافي
     pro_file = f"reports/DarkRecon_{domain}_{timestamp}_PROFESSIONAL.md"
     generate_professional_report(domain, data, pro_file)
     print(f"[+] Professional report saved: {pro_file}")
-     
+
+
 def generate_professional_report(domain, data, filename):
-    """
-    توليد تقرير احترافي مع تقييم المخاطر
-    """
+    """توليد تقرير احترافي مع تقييم المخاطر"""
     with open(filename, "w", encoding="utf-8") as f:
         # Header
         f.write(f"# 🔐 Web Reconnaissance Report\n\n")
@@ -130,14 +101,16 @@ def generate_professional_report(domain, data, filename):
             dorks = data["active"]["google_dorks"].get("dorks", {})
             f.write("| Category | Dork |\n")
             f.write("|----------|------|\n")
-            for category, dork in list(dorks.items())[:10]:  # أول 10 بس
+            for category, dork in list(dorks.items())[:10]:
                 f.write(f"| {category.replace('_', ' ').title()} | `{dork}` |\n")
             f.write("\n")
+        
         # Shodan Results
+                
         if "active" in data and "shodan" in data["active"]:
+            f.write("## 🌐 Shodan Intelligence\n\n")
             shodan = data["active"]["shodan"]
             if shodan.get("status") == "success":
-                f.write("## 🌐 Shodan Intelligence\n\n")
                 f.write("| Property | Value |\n")
                 f.write("|----------|-------|\n")
                 f.write(f"| IP Address | `{shodan.get('ip', 'Unknown')}` |\n")
@@ -147,32 +120,69 @@ def generate_professional_report(domain, data, filename):
                 f.write(f"| Open Ports (Shodan) | {', '.join(map(str, shodan.get('open_ports', [])))} |\n")
                 if shodan.get("vulns"):
                     f.write(f"| Known Vulnerabilities | {', '.join(shodan.get('vulns', []))} |\n")
-                f.write("\n")
             else:
-                f.write("## 🌐 Shodan Intelligence\n\n")
-                f.write(f"*{shodan.get('message', 'Shodan lookup failed')}*\n\n")
+                f.write(f"*{shodan.get('message', 'Shodan lookup failed')}*\n")
+            f.write("\n")
         
         # CVE Analysis Results
         if "active" in data and "cve_analysis" in data["active"]:
             f.write("## 🛡️ CVE Vulnerability Analysis\n\n")
             cve_analysis = data["active"]["cve_analysis"]
-            for key, cve_data in cve_analysis.items():
-                if cve_data.get("status") == "success" and cve_data.get("cves"):
-                    f.write(f"### {key}\n\n")
-                    f.write("| CVE ID | Severity | Score | Description |\n")
-                    f.write("|--------|----------|-------|-------------|\n")
-                    for cve in cve_data["cves"][:5]:
-                        severity = cve.get('severity', 'N/A')
-                        score = cve.get('cvss_score', 'N/A')
-                        desc = cve.get('description', '')[:80]
-                        f.write(f"| {cve['id']} | {severity} | {score} | {desc}... |\n")
-                    f.write("\n")
-                elif cve_data.get("status") == "error":
-                    f.write(f"### {key}\n")
-                    f.write(f"*Error: {cve_data.get('message', 'Unknown error')}*\n\n")
-                else:
-                    f.write(f"### {key}\n")
-                    f.write("*No CVEs found for this service*\n\n")   
+            
+            if isinstance(cve_analysis, dict):
+                for key, cve_data in cve_analysis.items():
+                    if isinstance(cve_data, dict) and cve_data.get("status") == "success" and cve_data.get("cves"):
+                        f.write(f"### {key}\n\n")
+                        f.write("| CVE ID | Severity | Score | Description |\n")
+                        f.write("|--------|----------|-------|-------------|\n")
+                        for cve in cve_data["cves"][:5]:
+                            severity = cve.get('severity', 'N/A')
+                            score = cve.get('cvss_score', 'N/A')
+                            desc = cve.get('description', '')[:80]
+                            f.write(f"| {cve['id']} | {severity} | {score} | {desc}... |\n")
+                        f.write("\n")
+                    elif isinstance(cve_data, dict) and cve_data.get("status") == "error":
+                        f.write(f"### {key}\n")
+                        f.write(f"*Error: {cve_data.get('message', 'Unknown error')}*\n\n")
+                    elif isinstance(cve_data, dict):
+                        f.write(f"### {key}\n")
+                        f.write("*No CVEs found for this service*\n\n")
+                    else:
+                        f.write(f"### {key}\n")
+                        f.write(f"*{cve_data}*\n\n")
+            else:
+                f.write(f"*{cve_analysis}*\n\n")
+        # WAF Results
+        if "active" in data and "waf" in data["active"]:
+            f.write("## 🛡️ WAF Detection Results\n\n")
+            waf = data["active"]["waf"]
+            if waf.get("has_waf"):
+                f.write(f"| Property | Value |\n")
+                f.write(f"|----------|-------|\n")
+                f.write(f"| WAF Detected | ✅ Yes |\n")
+                f.write(f"| WAF Name | **{waf.get('waf_name')}** |\n")
+                f.write(f"| Confidence | {waf.get('confidence')} |\n")
+                if waf.get("evidence"):
+                    f.write(f"| Evidence | {', '.join(waf['evidence'][:3])} |\n")
+            else:
+                f.write(f"*No WAF detected or unknown WAF*\n")
+            f.write("\n")
+        
+        # Email Extractor Results
+        if "active" in data and "emails" in data["active"]:
+            f.write("## 📧 Extracted Emails\n\n")
+            emails = data["active"]["emails"]
+            if emails.get("emails"):
+                f.write("| Email |\n")
+                f.write("|-------|\n")
+                for email in emails["emails"][:10]:
+                    f.write(f"| `{email}` |\n")
+                if len(emails["emails"]) > 10:
+                    f.write(f"| *... and {len(emails['emails']) - 10} more* |\n")
+            else:
+                f.write("*No emails found*\n")
+            f.write("\n")
+        
         # Recommendations
         f.write("## 📝 Recommendations\n\n")
         f.write("1. **Enable HSTS**: Add `Strict-Transport-Security` header to enforce HTTPS\n")
@@ -183,4 +193,3 @@ def generate_professional_report(domain, data, filename):
         # Footer
         f.write("---\n")
         f.write(f"*Report generated by DarkRecon Tool | {data['timestamp']}*\n")
-
