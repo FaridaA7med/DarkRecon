@@ -34,20 +34,31 @@ DarkRecon is a comprehensive Python tool for **passive and active web reconnaiss
 - Ask before each module (Y/n)
 - Colored terminal output
 - Progress tracking
-### Usage
 
-# Interactive full scan
+#### Usage
+
+## Basic Commands
+# Interactive full scan (recommended)
 python3 main.py example.com --mode full --interactive
 
-# Passive scan only
+# Passive scan only (no direct contact)
 python3 main.py example.com --mode passive
 
-# Active scan with custom ports
+# Active scan only (all default ports)
+python3 main.py example.com --mode active
+
+## Advanced Options
+
+# Scan specific ports only (faster)
 python3 main.py example.com --mode active --ports 80,443,8080
 
 # With Shodan API
 export SHODAN_API_KEY="your_api_key"
 python3 main.py example.com --mode full --interactive
+
+# Custom wordlist
+python3 main.py example.com --mode full --wordlist /path/to/wordlist.txt
+
 
 ## 📦 Installation
 
