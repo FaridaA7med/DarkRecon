@@ -35,6 +35,7 @@ YELLOW = Fore.YELLOW + Style.BRIGHT
 CYAN = Fore.CYAN + Style.BRIGHT
 WHITE = Fore.WHITE + Style.BRIGHT
 RESET = Style.RESET_ALL
+BLUE = Fore.BLUE + Style.BRIGHT
 
 
 def ask_user(question, default="yes"):
@@ -53,15 +54,24 @@ def ask_user(question, default="yes"):
 
 
 def print_banner():
-    """طباعة البانر الرئيسي"""
+    """طباعة البانر الرئيسي مع DIGILIANS بشكل فني"""
     print(f"""
-{YELLOW}╔═══════════════════════════════════════╗
-║       {WHITE}DarkRecon Tool{YELLOW}               ║
-║    {WHITE}Web Reconnaissance{YELLOW}            ║
-╚═══════════════════════════════════════╝{RESET}
+{BLUE}╔══════════════════════════════════════════════════════════════════╗
+║                                                                        ║
+║                    ██████╗ ██╗ ██████╗ ██╗                             ║
+║                    ██╔══██╗██║██╔════╝ ██║                             ║
+║                    ██║  ██║██║██║  ███╗██║                             ║
+║                    ██║  ██║██║██║   ██║██║                             ║
+║                    ██████╔╝██║╚██████╔╝██║                             ║
+║                    ╚═════╝ ╚═╝ ╚═════╝ ╚═╝                             ║
+║                                                                        ║
+║                        {RED}DarkRecon Tool{BLUE}                    ║
+║                      {WHITE}Web Reconnaissance{BLUE}                   ║
+║                                                                        ║
+║              {WHITE}Passive & Active Information Gathering{BLUE}       ║
+║                                                                      ║
+╚══════════════════════════════════════════════════════════════════════╝{RESET}
     """)
-
-
 def print_success(msg):
     """طباعة رسالة نجاح"""
     print(f"{GREEN}[✓]{RESET} {msg}")
@@ -94,7 +104,7 @@ def print_finding(msg):
     print(f"{GREEN}[+] {msg}{RESET}")
 
 
-def run_passive(domain, interactive=False):
+def run_passive(domain, interactive=False, shodan_key=None):
     """تشغيل جميع موديولات passive recon"""
     print_title("PASSIVE RECONNAISSANCE")
     
@@ -154,7 +164,56 @@ def run_passive(domain, interactive=False):
     else:
         print_error("Skipping external tools")
         results["passive_subdomains"] = []
+
+     # Robots.txt
+    print_subtitle("Robots.txt")
+    if not interactive or ask_user("Check robots.txt?"):
+        print_info("Checking for robots.txt...")
+        results["robots_txt"] = get_robots_txt(domain)
+        if results["robots_txt"].get("exists"):
+            print_success("robots.txt found")
+    else:
+        print_error("Skipping robots.txt check")
+        results["robots_txt"] = {"status": "skipped"}
+    # Shodan Lookup
+    print_subtitle("Shodan Intelligence")
+    if not interactive or ask_user("Run Shodan lookup? (requires API key)"):
+        print_info("Querying Shodan database...")
+        if shodan_key is None:
+            shodan_key = os.environ.get('SHODAN_API_KEY')
+        results["shodan"] = shodan_lookup(domain, shodan_key)
+        if results["shodan"].get("status") == "success":
+            print_success("Shodan data retrieved")
+            if results["shodan"].get("open_ports"):
+                print_finding(f"Open ports from Shodan: {', '.join(map(str, results['shodan']['open_ports']))}")
+        else:
+            print_error(f"Shodan: {results['shodan'].get('message', 'Failed')}")
+    else:
+        print_error("Skipping Shodan lookup")
+        results["shodan"] = {"status": "skipped"}
     
+    
+    # Google Dorks
+    print_subtitle("OSINT - Google Dorks")
+    if not interactive or ask_user("Generate Google dorks?"):
+        print_info("Generating Google dork queries...")
+        results["google_dorks"] = generate_google_dorks(domain)
+        print_success(f"Generated {results['google_dorks'].get('total_dorks', 0)} dorks")
+    else:
+        print_error("Skipping Google dorks generation")
+        results["google_dorks"] = {"status": "skipped"}
+    # Wayback URLs
+    print_subtitle("Wayback Machine")
+    if not interactive or ask_user("Run Wayback Machine lookup?"):
+        print_info("Fetching archived URLs...")
+        results["wayback_urls"] = get_wayback_urls(domain)
+        if results["wayback_urls"]:
+            print_success(f"Found {len(results['wayback_urls'])} archived URLs")
+    else:
+        print_error("Skipping Wayback Machine lookup")
+        results["wayback_urls"] = []
+  
+        
     return results
 
 
@@ -203,22 +262,6 @@ def run_active(domain, wordlist, ports=None, interactive=False, shodan_key=None)
         print_error("Skipping CVE analysis")
         results["cve_analysis"] = {"status": "skipped"}
     
-    # Shodan Lookup
-    print_subtitle("Shodan Intelligence")
-    if not interactive or ask_user("Run Shodan lookup? (requires API key)"):
-        print_info("Querying Shodan database...")
-        if shodan_key is None:
-            shodan_key = os.environ.get('SHODAN_API_KEY')
-        results["shodan"] = shodan_lookup(domain, shodan_key)
-        if results["shodan"].get("status") == "success":
-            print_success("Shodan data retrieved")
-            if results["shodan"].get("open_ports"):
-                print_finding(f"Open ports from Shodan: {', '.join(map(str, results['shodan']['open_ports']))}")
-        else:
-            print_error(f"Shodan: {results['shodan'].get('message', 'Failed')}")
-    else:
-        print_error("Skipping Shodan lookup")
-        results["shodan"] = {"status": "skipped"}
     
     # Alive check (using subdomains from passive)
     print_subtitle("Alive Host Check")
@@ -244,17 +287,6 @@ def run_active(domain, wordlist, ports=None, interactive=False, shodan_key=None)
         print_error("Skipping directory fuzzing")
         results["directories"] = []
     
-    # Wayback URLs
-    print_subtitle("Wayback Machine")
-    if not interactive or ask_user("Run Wayback Machine lookup?"):
-        print_info("Fetching archived URLs...")
-        results["wayback_urls"] = get_wayback_urls(domain)
-        if results["wayback_urls"]:
-            print_success(f"Found {len(results['wayback_urls'])} archived URLs")
-    else:
-        print_error("Skipping Wayback Machine lookup")
-        results["wayback_urls"] = []
-    
     # HTTP Headers
     print_subtitle("HTTP Headers Analysis")
     if not interactive or ask_user("Run HTTP headers analysis?"):
@@ -265,28 +297,8 @@ def run_active(domain, wordlist, ports=None, interactive=False, shodan_key=None)
         print_error("Skipping HTTP headers analysis")
         results["http_headers"] = {"status": "skipped"}
     
-    # Robots.txt
-    print_subtitle("Robots.txt")
-    if not interactive or ask_user("Check robots.txt?"):
-        print_info("Checking for robots.txt...")
-        results["robots_txt"] = get_robots_txt(domain)
-        if results["robots_txt"].get("exists"):
-            print_success("robots.txt found")
-    else:
-        print_error("Skipping robots.txt check")
-        results["robots_txt"] = {"status": "skipped"}
     
-    # Google Dorks
-    print_subtitle("OSINT - Google Dorks")
-    if not interactive or ask_user("Generate Google dorks?"):
-        print_info("Generating Google dork queries...")
-        results["google_dorks"] = generate_google_dorks(domain)
-        print_success(f"Generated {results['google_dorks'].get('total_dorks', 0)} dorks")
-    else:
-        print_error("Skipping Google dorks generation")
-        results["google_dorks"] = {"status": "skipped"}
-    
-        # WAF Detection
+    # WAF Detection
     print_subtitle("WAF Detection")
     if not interactive or ask_user("Run WAF detection?"):
         print_info("Detecting Web Application Firewall...")
@@ -342,10 +354,22 @@ def main():
     print_info(f"Target: {WHITE}{domain}{RESET}")
     print_info(f"Mode: {WHITE}{args.mode}{RESET}")
     
-    if args.mode in ["passive", "full"]:
-        all_results["passive"] = run_passive(domain, args.interactive)
+    if args.mode == "passive":
+        shodan_key = args.shodan_key if args.shodan_key else os.environ.get('SHODAN_API_KEY')
+        all_results["results"] = run_passive(domain, args.interactive, shodan_key)
     
-    if args.mode in ["active", "full"]:
+    elif args.mode == "active":
+        shodan_key = args.shodan_key if args.shodan_key else os.environ.get('SHODAN_API_KEY')
+        if args.ports:
+            ports_list = [int(p.strip()) for p in args.ports.split(",")]
+            all_results["results"] = run_active(domain, args.wordlist, ports_list, args.interactive, shodan_key)
+        else:
+            all_results["results"] = run_active(domain, args.wordlist, interactive=args.interactive, shodan_key=shodan_key)
+    
+    elif args.mode == "full":
+        shodan_key = args.shodan_key if args.shodan_key else os.environ.get('SHODAN_API_KEY')
+        all_results["passive"] = run_passive(domain, args.interactive, shodan_key)
+        
         if args.interactive:
             if not ask_user("\nPassive reconnaissance completed. Continue with active recon?"):
                 print_error("Exiting as requested")
@@ -353,15 +377,12 @@ def main():
                 save_report(domain, all_results)
                 return
         
-        # جلب Shodan API key
-        shodan_key = args.shodan_key if args.shodan_key else os.environ.get('SHODAN_API_KEY')
-        
         if args.ports:
             ports_list = [int(p.strip()) for p in args.ports.split(",")]
             all_results["active"] = run_active(domain, args.wordlist, ports_list, args.interactive, shodan_key)
         else:
-            all_results["active"] = run_active(domain, args.wordlist, interactive=args.interactive, shodan_key=shodan_key)
-    
+            all_results["active"] = run_active(domain, args.wordlist, interactive=args.interactive, shodan_key=shodan_key)    
+    save_report(domain, all_results)    
     # Save report
     save_report(domain, all_results)
     

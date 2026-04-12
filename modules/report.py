@@ -54,15 +54,23 @@ def generate_professional_report(domain, data, filename):
         
         risks = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0, "INFO": 0}
         
-        if "active" in data and "http_headers" in data["active"]:
-            headers = data["active"]["http_headers"]
+        # تحديد البيانات اللي هنستخدمها
+        if "results" in data:
+            scan_data = data["results"]
+        elif "active" in data:
+            scan_data = data["active"]
+        else:
+            scan_data = {}
+        
+        if "http_headers" in scan_data:
+            headers = scan_data["http_headers"]
             if "security_audit" in headers:
                 for header, info in headers["security_audit"].items():
                     if info["status"] == "MISSING":
                         risks[info["risk"]] += 1
         
-        if "active" in data and "port_scan" in data["active"]:
-            open_count = data["active"]["port_scan"].get("open_count", 0)
+        if "port_scan" in scan_data:
+            open_count = scan_data["port_scan"].get("open_count", 0)
             if open_count > 0:
                 risks["MEDIUM"] += 1
         
@@ -73,19 +81,19 @@ def generate_professional_report(domain, data, filename):
         f.write(f"| 🔵 INFO | {risks['INFO']} | Informational only |\n\n")
         
         # Open Ports
-        if "active" in data and "port_scan" in data["active"]:
+        if "port_scan" in scan_data:
             f.write("## 🔌 Open Ports Discovered\n\n")
             f.write("| Port | Service | Risk |\n")
             f.write("|------|---------|------|\n")
-            for port in data["active"]["port_scan"].get("open_ports", []):
+            for port in scan_data["port_scan"].get("open_ports", []):
                 risk = "MEDIUM" if port["port"] in [21,23,3306,5432] else "INFO"
                 f.write(f"| {port['port']} | {port['service']} | {risk} |\n")
             f.write("\n")
         
         # Missing Security Headers
-        if "active" in data and "http_headers" in data["active"]:
+        if "http_headers" in scan_data:
             f.write("## ⚠️ Missing Security Headers\n\n")
-            headers = data["active"]["http_headers"]
+            headers = scan_data["http_headers"]
             if "security_audit" in headers:
                 f.write("| Header | Risk | Attack Mitigated | Remediation |\n")
                 f.write("|--------|------|------------------|-------------|\n")
@@ -95,10 +103,10 @@ def generate_professional_report(domain, data, filename):
             f.write("\n")
         
         # Google Dorks
-        if "active" in data and "google_dorks" in data["active"]:
+        if "google_dorks" in scan_data:
             f.write("## 🔍 OSINT Discovery (Google Dorks)\n\n")
             f.write("Use these Google search queries for further OSINT investigation:\n\n")
-            dorks = data["active"]["google_dorks"].get("dorks", {})
+            dorks = scan_data["google_dorks"].get("dorks", {})
             f.write("| Category | Dork |\n")
             f.write("|----------|------|\n")
             for category, dork in list(dorks.items())[:10]:
@@ -106,10 +114,9 @@ def generate_professional_report(domain, data, filename):
             f.write("\n")
         
         # Shodan Results
-                
-        if "active" in data and "shodan" in data["active"]:
+        if "shodan" in scan_data:
             f.write("## 🌐 Shodan Intelligence\n\n")
-            shodan = data["active"]["shodan"]
+            shodan = scan_data["shodan"]
             if shodan.get("status") == "success":
                 f.write("| Property | Value |\n")
                 f.write("|----------|-------|\n")
@@ -125,9 +132,9 @@ def generate_professional_report(domain, data, filename):
             f.write("\n")
         
         # CVE Analysis Results
-        if "active" in data and "cve_analysis" in data["active"]:
+        if "cve_analysis" in scan_data:
             f.write("## 🛡️ CVE Vulnerability Analysis\n\n")
-            cve_analysis = data["active"]["cve_analysis"]
+            cve_analysis = scan_data["cve_analysis"]
             
             if isinstance(cve_analysis, dict):
                 for key, cve_data in cve_analysis.items():
@@ -147,31 +154,29 @@ def generate_professional_report(domain, data, filename):
                     elif isinstance(cve_data, dict):
                         f.write(f"### {key}\n")
                         f.write("*No CVEs found for this service*\n\n")
-                    else:
-                        f.write(f"### {key}\n")
-                        f.write(f"*{cve_data}*\n\n")
             else:
                 f.write(f"*{cve_analysis}*\n\n")
+        
         # WAF Results
-        if "active" in data and "waf" in data["active"]:
+        if "waf" in scan_data:
             f.write("## 🛡️ WAF Detection Results\n\n")
-            waf = data["active"]["waf"]
+            waf = scan_data["waf"]
             if waf.get("has_waf"):
-                f.write(f"| Property | Value |\n")
-                f.write(f"|----------|-------|\n")
+                f.write("| Property | Value |\n")
+                f.write("|----------|-------|\n")
                 f.write(f"| WAF Detected | ✅ Yes |\n")
                 f.write(f"| WAF Name | **{waf.get('waf_name')}** |\n")
                 f.write(f"| Confidence | {waf.get('confidence')} |\n")
                 if waf.get("evidence"):
                     f.write(f"| Evidence | {', '.join(waf['evidence'][:3])} |\n")
             else:
-                f.write(f"*No WAF detected or unknown WAF*\n")
+                f.write("*No WAF detected or unknown WAF*\n")
             f.write("\n")
         
         # Email Extractor Results
-        if "active" in data and "emails" in data["active"]:
+        if "emails" in scan_data:
             f.write("## 📧 Extracted Emails\n\n")
-            emails = data["active"]["emails"]
+            emails = scan_data["emails"]
             if emails.get("emails"):
                 f.write("| Email |\n")
                 f.write("|-------|\n")
